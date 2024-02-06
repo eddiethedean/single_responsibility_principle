@@ -10,12 +10,12 @@ class TradeProcessor:
 
     # Listing 2
     def process_trades(self, stream: Sequence[str]) -> None:
-        lines: Tuple[str] = self.__read_trade_data(stream)
+        lines: Tuple[str, ...] = self.__read_trade_data(stream)
         trades: List[TradeRecord] = self.__parse_trades(lines)
         self.__store_trades(trades)
 
     # Listing 3
-    def __read_trade_data(self, stream: Sequence[str]) -> Tuple[str]:
+    def __read_trade_data(self, stream: Sequence[str]) -> Tuple[str, ...]:
         return tuple(_line for _line in stream)
 
     # Listing 4
@@ -72,11 +72,12 @@ class TradeProcessor:
     # Listing 8
     def __store_trades(self, trades: Sequence[TradeRecord]) -> None:
         engine = create_engine('sqlite:///trades.db', echo=False)
-        metadata = MetaData(engine)
+        metadata = MetaData()
+        metadata.reflect(engine)
         tble = Table('trade_table', metadata, autoload=True, autoload_with=engine)
 
         for trade in trades:
-            ins = tble.insert(None).values(source_currency=trade.source_currency,
+            ins = tble.insert().values(source_currency=trade.source_currency,
                                            destination_currency=trade.destination_currency,
                                            lots=trade.lots,
                                            price=trade.price)

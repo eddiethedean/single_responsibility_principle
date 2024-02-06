@@ -2,6 +2,7 @@ from typing import List, Optional, Sequence, Tuple
 import abc
 
 from sqlalchemy import Table, MetaData, create_engine
+
 from trade_record import TradeRecord
 from ignore_exception import int_try_parse, float_try_parse
 
@@ -26,7 +27,7 @@ class ITradeValidator(metaclass=abc.ABCMeta):
 
 class ITradeMapper(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def map(self, trade: Sequence[str]) -> TradeRecord:
+    def map(self, fields: Sequence[str]) -> TradeRecord:
         raise NotImplementedError
 
 
@@ -51,10 +52,12 @@ class ILogger(metaclass=abc.ABCMeta):
 
 # Listing 9
 class TradeProcessor:
-    def __init__(self,
-                 trade_data_provider: ITradeProvider,
-                 trade_parcer: ITradeParser,
-                 trade_storage: ITradeStorage) -> None:
+    def __init__(
+        self,
+        trade_data_provider: ITradeProvider,
+        trade_parcer: ITradeParser,
+        trade_storage: ITradeStorage
+    ) -> None:
         self.trade_data_provider = trade_data_provider
         self.trade_parcer = trade_parcer
         self.trade_storage = trade_storage
@@ -69,15 +72,17 @@ class StreamTradeProvider(ITradeProvider):
     def __init__(self, stream: Sequence[str]):
         self.stream = stream
 
-    def get_trade_data(self) -> Tuple[str]:
-        return Tuple(_line for _line in self.stream)
+    def get_trade_data(self) -> Tuple[str, ...]:
+        return tuple(_line for _line in self.stream)
 
 
 # Listing 11
 class SimpleTradeParser(ITradeParser):
-    def __init__(self,
-                 tradeValidator: ITradeValidator,
-                 tradeMapper: ITradeMapper) -> None:
+    def __init__(
+        self,
+        tradeValidator: ITradeValidator,
+        tradeMapper: ITradeMapper
+    ) -> None:
         self.tradeValidator = tradeValidator
         self.tradeMapper = tradeMapper
     
@@ -121,26 +126,29 @@ class SimpleTradeValidator(ITradeValidator):
 
 
 class SqlAlchemyTradeStorage(ITradeStorage):
-    def __init__(self, logger: ILogger) -> None:
+    def __init__(self, connection_str: str, logger: ILogger) -> None:
+        self.connection_str = connection_str
         self.logger = logger
 
     def persist(self, trades: Sequence[TradeRecord]) -> None:
-        engine = create_engine('sqlite:///trades.db', echo=False)
-        metadata = MetaData(engine)
+        engine = create_engine(self.connection_str, echo=False)
+        metadata = MetaData()
+        metadata.reflect(engine)
         tble = Table('trade_table', metadata, autoload=True, autoload_with=engine)
 
         for trade in trades:
-            ins = tble.insert(None).values(source_currency=trade.source_currency,
-                                           destination_currency=trade.destination_currency,
-                                           lots=trade.lots,
-                                           price=trade.price)
+            ins = tble.insert().values(
+                source_currency=trade.source_currency,
+                destination_currency=trade.destination_currency,
+                lots=trade.lots,
+                price=trade.price
+            )
             conn = engine.connect()
             conn.execute(ins)
 
-        self.logger.log_warning(f'INFO: {len(trades)} trades processed')
+        self.logger.log_info(f'INFO: {len(trades)} trades processed')
 
 
-    
 class SimpleTradeMapper(ITradeMapper):
     lots_size: float = 100000.0
     def map(self, fields: Sequence[str]) -> TradeRecord:
@@ -148,10 +156,12 @@ class SimpleTradeMapper(ITradeMapper):
         destination_currency_code: str = fields[0][3:6]
         trade_amount = int(fields[1])
         trade_price = float(fields[2])
-        trade_record = TradeRecord(source_currency=source_currency_code,
-                                   destination_currency=destination_currency_code,
-                                   lots=trade_amount/self.lots_size,
-                                   price=trade_price)
+        trade_record = TradeRecord(
+                           source_currency=source_currency_code,
+                           destination_currency=destination_currency_code,
+                           lots=trade_amount/self.lots_size,
+                           price=trade_price
+                       )
         return trade_record
 
 

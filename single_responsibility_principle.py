@@ -30,11 +30,12 @@ class TradeProcessor:
             trade_amount: Optional[int] = int_try_parse(fields[1])
             if trade_amount is None:
                 print(f"WARN: Trade amount on line {line_count} not a valid integer: '{fields[1]}'")
+                continue
 
             trade_price: Optional[float] = float_try_parse(fields[2])
             if trade_price is None:
                 print(f"WARN: Trade price on line {line_count} not a valid decimal: '{fields[2]}'")
-                trade_price = -1.0
+                continue
 
             source_currency_code: str = fields[0][:3]
             destination_currency_code: str = fields[0][3:6]
@@ -49,11 +50,12 @@ class TradeProcessor:
             line_count += 1
         
         engine = create_engine('sqlite:///trades.db', echo=False)
-        metadata = MetaData(engine)
+        metadata = MetaData()
+        metadata.reflect(engine)
         tbl = Table('trade_table', metadata, autoload=True, autoload_with=engine)
 
         for trade in trades:
-            ins = tbl.insert(None).values(source_currency=trade.source_currency,
+            ins = tbl.insert().values(source_currency=trade.source_currency,
                                        destination_currency=trade.destination_currency,
                                        lots=trade.lots,
                                        price=trade.price)
