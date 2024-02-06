@@ -165,6 +165,17 @@ class SimpleTradeMapper(ITradeMapper):
         return trade_record
 
 
+class SimpleLogger:
+    def log_warning(self, warning: str) -> None:
+        print('WARNING:', warning)
+    
+    def log_info(self, info: str) -> None:
+        print('INFO:', info)
+
+    def log_error(self, error: str) -> None:
+        print('ERROR:', error)
+
+
 
     
 

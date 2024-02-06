@@ -23,7 +23,7 @@ class TradeProcessor:
             if len(fields) != 3:
                 print(f'WARN: Line {line_count} malformed. Only {len(fields)} fields(s) found.')
                 continue
-            if len(fields[0]) !=6:
+            if len(fields[0]) !=3:
                 print(f"WARN: Trade currencies on line {line_count} malformed: '{len(fields)}'")
                 continue
 
