@@ -108,7 +108,7 @@ class SimpleTradeValidator(ITradeValidator):
             self.logger.log_warning(f'Line malformed. Only {field_len} field(s) found.')
             return False
         field_one: str = fields[0]
-        if len(field_one) != 6:
+        if len(field_one) != 3:
             self.logger.log_warning(f"Trade currency malformed: '{field_one}'")
             return False
 

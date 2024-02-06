@@ -37,7 +37,7 @@ class TradeProcessor:
             self.__log_message(f'WARN: Line {line_count} malformed. Only {len(fields)} fields(s) found.')
             return False
 
-        if len(fields[0]) != 6:
+        if len(fields[0]) != 3:
             self.__log_message(f"WARN: Trade currencies on line {line_count} malformed: '{len(fields)}'")
             return False
 
