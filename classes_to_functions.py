@@ -1,3 +1,4 @@
+from functools import partial
 from typing import List, Optional, Sequence, Protocol, Tuple
 
 from sqlalchemy import MetaData, Table, create_engine
@@ -54,17 +55,21 @@ def process_trades(
     persist_trade(trades=trades)
     
 # Replaces StreamTradeProvider.get_trade_data
-# Implements CGetTradeData interface
 def get_stream_trade_data(
-    stream: Sequence[str] # pass with partial
+    stream: Sequence[str]
 ) -> Tuple[str, ...]:
     return tuple(_line for _line in stream)
+
+
+def init_get_stream_trade_data(
+    stream: Sequence[str]
+) -> CGetTradeData:
+    return partial(get_stream_trade_data, stream)
     
 # Replace SimpleTradeParser.parse
-# Implements CParseTradeData interface
 def parse_simple_trades(
-    validate_trade_fields: CValidateTradeFields, # pass with partial
-    map_trade: CMapTrade,                        # pass with partial
+    validate_trade_fields: CValidateTradeFields,
+    map_trade: CMapTrade,
     trade_data: Sequence[str]
 ) -> List[TradeRecord]:
     trades: List[TradeRecord] = []
@@ -76,11 +81,17 @@ def parse_simple_trades(
         trade = map_trade(fields=fields)
         trades.append(trade)
     return trades
+
+
+def init_parse_simple_trades(
+    validate_trade_fields: CValidateTradeFields,
+    map_trade: CMapTrade,
+) -> CParseTradeData:
+    return partial(parse_simple_trades, validate_trade_fields, map_trade)
     
 # Replace SimpleTradeValidator.validate
-# Implements CValidateTradeFields
 def validate_simple_trade(
-    logger: ILogger, # pass with partial
+    logger: ILogger,
     fields: Sequence[str]
 ) -> bool:
     field_len: int = len(fields)
@@ -104,17 +115,23 @@ def validate_simple_trade(
         
     return True
 
+
+def init_validate_simple_trade(
+    logger: ILogger
+) -> CValidateTradeFields:
+    return partial(validate_simple_trade, logger)
+
 # Replace SqlAlchemyTradeStorage.persist
-# Implements CPersistTrade
 def persist_trade_sqlalchemy(
-    connection_str: str, # pass with partial
-    logger: ILogger,     # pass with partial
+    connection_str: str,
+    table_name: str,
+    logger: ILogger,
     trades: Sequence[TradeRecord]
 ) -> None:
     engine = create_engine(connection_str, echo=False)
     metadata = MetaData()
     metadata.reflect(engine)
-    tble = Table('trade_table', metadata, autoload=True, autoload_with=engine)
+    tble = Table(table_name, metadata, autoload=True, autoload_with=engine)
 
     for trade in trades:
         with engine.connect() as conn:
@@ -128,6 +145,14 @@ def persist_trade_sqlalchemy(
             conn.commit()
 
     logger.log_info(f'INFO: {len(trades)} trades processed')
+
+
+def init_persist_trade_sqlalchemy(
+    connection_str: str,
+    table_name: str,
+    logger: ILogger
+) -> CPersistTrade:
+    return partial(persist_trade_sqlalchemy. connection_str, table_name, logger)
     
 
 # Replace SimpleTradeMapper.map
@@ -146,7 +171,7 @@ def map_simple_trade(fields: Sequence[str]) -> TradeRecord:
                     )
     return trade_record
 
-
+# Implements ILogger interface
 class SimpleLogger:
     def log_warning(self, warning: str) -> None:
         print('WARNING:', warning)
@@ -156,3 +181,16 @@ class SimpleLogger:
 
     def log_error(self, error: str) -> None:
         print('ERROR:', error)
+
+
+def process_simple_trades(
+    stream: Sequence[str],
+    connection_str: str,
+    table_name: str
+) -> None:
+    get_trade_data = init_get_stream_trade_data(stream=stream)
+    logger = SimpleLogger()
+    validate_trade_fields = init_validate_simple_trade(logger=logger)
+    parse_trade_data = init_parse_simple_trades(validate_trade_fields=validate_trade_fields, map_trade=map_simple_trade)
+    persist_trade = init_persist_trade_sqlalchemy(connection_str=connection_str, table_name=table_name, logger=logger)
+    process_trades(get_trade_data, parse_trade_data, persist_trade)
